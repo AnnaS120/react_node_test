@@ -18,6 +18,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { FaSearch, FaFilter, FaSpinner, FaExclamationTriangle, FaTasks } from 'react-icons/fa';
+import TaskList from './TaskList';
 
 const TaskFilter = () => {
   // State management with proper initialization
@@ -79,9 +80,8 @@ const TaskFilter = () => {
       if (e.key === 'tasks') {
         try {
           const updatedTasks = JSON.parse(e.newValue || '[]');
+          // Update tasks; filtering & counts are handled by the effect below
           setTasks(updatedTasks);
-          applyFilters(updatedTasks, filters);
-          updateCounts(updatedTasks);
         } catch (err) {
           console.error('Error parsing tasks from storage:', err);
         }
@@ -96,6 +96,12 @@ const TaskFilter = () => {
       window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
+
+  // Recompute filtered results and counts whenever tasks or filters change
+  useEffect(() => {
+    applyFilters(tasks, filters);
+    updateCounts(tasks);
+  }, [tasks, filters, applyFilters]);
 
   /**
    * Update task counts by status
@@ -132,8 +138,8 @@ const TaskFilter = () => {
     if (filterSettings.search.trim()) {
       const searchTerm = filterSettings.search.toLowerCase().trim();
       result = result.filter(task => 
-        task.title.toLowerCase().includes(searchTerm) || 
-        task.description.toLowerCase().includes(searchTerm)
+        String(task.title || '').toLowerCase().includes(searchTerm) || 
+        String(task.description || '').toLowerCase().includes(searchTerm)
       );
     }
     
@@ -153,7 +159,7 @@ const TaskFilter = () => {
     };
     
     setFilters(newFilters);
-    applyFilters(tasks, newFilters);
+    // Filtering will be reapplied by the effect watching [tasks, filters]
   };
 
   // Loading state
@@ -235,72 +241,13 @@ const TaskFilter = () => {
       </div>
       
       {/* Task list */}
-      {filteredTasks.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">
-          <p>No tasks match your filters</p>
-          <button
-            className="mt-2 px-4 py-2 text-sm text-blue-600 hover:text-blue-800"
-            onClick={() => {
-              const resetFilters = { status: 'all', search: '' };
-              setFilters(resetFilters);
-              applyFilters(tasks, resetFilters);
-            }}
-          >
-            Reset Filters
-          </button>
-        </div>
-      ) : (
-        <ul className="divide-y divide-gray-200">
-          {filteredTasks.map((task) => (
-            <li key={task._id} className="py-4">
-              <div className="flex items-start justify-between">
-                <div className="flex-1 min-w-0">
-                  <h3 className={`text-lg font-medium ${task.status === 'complete' ? 'line-through text-gray-500' : 'text-gray-900'}`}>
-                    {task.title}
-                  </h3>
-                  <p className={`mt-1 text-sm ${task.status === 'complete' ? 'text-gray-400' : 'text-gray-600'}`}>
-                    {task.description}
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <span 
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        task.status === 'complete' 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-yellow-100 text-yellow-800'
-                      }`}
-                    >
-                      {task.status === 'complete' ? 'Complete' : 'Incomplete'}
-                    </span>
-                    
-                    {task.priority && (
-                      <span 
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          task.priority === 'high' 
-                            ? 'bg-red-100 text-red-800' 
-                            : task.priority === 'medium'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-green-100 text-green-800'
-                        }`}
-                      >
-                        {task.priority}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                
-                {task.dueDate && (
-                  <div className="ml-4 flex-shrink-0 text-sm text-gray-500">
-                    Due: {new Date(task.dueDate).toLocaleDateString()}
-                  </div>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+      <TaskList
+        tasks={filteredTasks}
+        allTasks={tasks}
+        onTasksChange={setTasks}
+      />
     </div>
   );
 };
 
 export default TaskFilter;
-

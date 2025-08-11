@@ -59,19 +59,15 @@ import NotificationProvider from "./contexts/NotificationContext";
 const ProtectedRoute = ({ children, requiredRole }) => {
   const { user, hasRole } = useAuth();
   const location = useLocation();
-  
-  // Check if user is authenticated
+
   const isAuthenticated = !!user || !!localStorage.getItem("token");
-  
-  // If not authenticated, redirect to login
+
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
-  
-  // If role is required, check if user has the role
+
   if (requiredRole) {
-    const hasRequiredRole = hasRole(requiredRole);
-    
+    const hasRequiredRole = hasRole(requiredRole); // from useAuth()
     if (!hasRequiredRole) {
       // Redirect to appropriate dashboard based on user's role
       const userRole = localStorage.getItem("userRole");
@@ -80,9 +76,19 @@ const ProtectedRoute = ({ children, requiredRole }) => {
       return <Navigate to={redirectPath} replace />;
     }
   }
-  
-  // User is authenticated and has required role (if specified)
+
   return children;
+};
+
+/**
+ * GuestOnly Route Component
+ * 
+ * Redirects authenticated users away from login/signup/forgot/reset pages.
+ */
+const GuestOnly = ({ children }) => {
+  const { user } = useAuth();
+  const isAuthenticated = !!user || !!localStorage.getItem("token");
+  return isAuthenticated ? <Navigate to="/user/dashboard" replace /> : children;
 };
 
 /**
@@ -97,16 +103,25 @@ function App() {
         <Router>
           <div className="flex flex-col min-h-screen">
             <Navbar />
-            
+
             <main className="flex-grow">
               <Routes>
-                {/* Public Routes */}
-                <Route path="/" element={<Landing />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/signup" element={<Signup />} />
-                <Route path="/forgot-password" element={<ForgotPassword />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-                
+                {/* Landing now requires authentication */}
+                <Route
+                  path="/"
+                  element={
+                    <ProtectedRoute>
+                      <Landing />
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* Auth pages (guest-only) */}
+                <Route path="/login" element={<GuestOnly><Login /></GuestOnly>} />
+                <Route path="/signup" element={<GuestOnly><Signup /></GuestOnly>} />
+                <Route path="/forgot-password" element={<GuestOnly><ForgotPassword /></GuestOnly>} />
+                <Route path="/reset-password" element={<GuestOnly><ResetPassword /></GuestOnly>} />
+
                 {/* Protected Admin Routes */}
                 <Route 
                   path="/admin/dashboard" 
@@ -164,7 +179,7 @@ function App() {
                     </ProtectedRoute>
                   } 
                 />
-                
+
                 {/* Protected User Routes */}
                 <Route 
                   path="/user/dashboard" 
@@ -214,12 +229,12 @@ function App() {
                     </ProtectedRoute>
                   } 
                 />
-                
-                {/* Fallback Route - Redirect to landing page */}
+
+                {/* Fallback Route */}
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </main>
-            
+
             <Footer />
           </div>
         </Router>

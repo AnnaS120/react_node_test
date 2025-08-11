@@ -1,17 +1,7 @@
 /**
  * Authentication Context
- * 
- * Provides authentication state and methods throughout the application.
- * Implements JWT-based authentication with secure storage and proper state management.
- * 
- * Features:
- * - User authentication state management
- * - Login/logout functionality
- * - Token persistence
- * - Role-based access control support
- * 
- * @author Senior Full-Stack Engineer
- * @version 1.0.0
+ * Uses backend-issued JWT. Persists token/email/role in localStorage.
+ * @version 1.1.0
  */
 
 import React, { createContext, useState, useContext, useEffect } from "react";
@@ -35,10 +25,7 @@ export const useAuth = () => {
  * @param {React.ReactNode} props.children - Child components
  */
 const AuthProvider = ({ children }) => {
-  /**
-   * Initialize user state from localStorage if available
-   * This ensures authentication persists across page refreshes
-   */
+  // Restore session on refresh
   const [user, setUser] = useState(() => {
     const token = localStorage.getItem("token");
     const email = localStorage.getItem("email");
@@ -53,58 +40,57 @@ const AuthProvider = ({ children }) => {
    * In a production app, this would verify the token with the backend
    */
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        
-        if (token) {
-          // In a real app, we would validate the token with the server
-          // For this demo, we'll just check if it exists
-          const email = localStorage.getItem("email");
-          
-          if (email) {
-            setUser({ email });
-          } else {
-            // If email is missing but token exists, something is wrong
-            // Clear authentication data
-            handleLogout();
-          }
-        }
-      } catch (error) {
-        console.error("Authentication check failed:", error);
-        handleLogout();
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    checkAuth();
+    // Optional: validate token with backend here
+    const token = localStorage.getItem("token");
+    const email = localStorage.getItem("email");
+    if (token && email) setUser({ email });
+    else handleLogout();
+    setLoading(false);
   }, []);
 
-  /**
-   * Handles user login
-   * @param {string} email - User's email
-   * @param {string} password - User's password (not used in mock implementation)
-   * @returns {Promise<Object>} User data
-   */
+  // ---- Auth API calls ----
   const login = async (email, password) => {
-    // In a real app, this would make an API call
-    // For this demo, we just update the state
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || "Login failed");
+    }
+
+    const data = await res.json(); // { token, userId, role }
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("userId", data.userId);
+    localStorage.setItem("userRole", data.role);
+    localStorage.setItem("email", email);
+
     setUser({ email });
-    return { email };
+    return { email, role: data.role, userId: data.userId };
   };
 
-  /**
-   * Handles user signup
-   * @param {string} email - User's email
-   * @param {string} password - User's password
-   * @returns {Promise<Object>} User data
-   */
-  const signup = async (email, password) => {
-    // In a real app, this would make an API call
-    // For this demo, we just update the state
+  const signup = async (email, password, FullName, role = "user") => {
+    const res = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ FullName, email, password, role }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || "Signup failed");
+    }
+
+    const data = await res.json(); // { token, userId, role }
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("userId", data.userId);
+    localStorage.setItem("userRole", data.role);
+    localStorage.setItem("email", email);
+
     setUser({ email });
-    return { email };
+    return { email, role: data.role, userId: data.userId };
   };
 
   /**
@@ -117,12 +103,7 @@ const AuthProvider = ({ children }) => {
     localStorage.removeItem("userRole");
     localStorage.removeItem("userId");
     localStorage.removeItem("email");
-    
-    // Reset user state
     setUser(null);
-    
-    // In a real app, we might also invalidate the token on the server
-    console.log("User logged out");
   };
 
   /**
@@ -131,7 +112,7 @@ const AuthProvider = ({ children }) => {
    * @returns {Promise<void>}
    */
   const resetPassword = async (email) => {
-    // In a real app, this would make an API call
+    // Hook up to your backend when ready
     console.log("Password reset requested for:", email);
     return Promise.resolve();
   };
